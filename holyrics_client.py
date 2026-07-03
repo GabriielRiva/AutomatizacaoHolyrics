@@ -132,8 +132,10 @@ class HolyricsClient:
         quick_presentation: se True, mostra em popup sem interromper a
             apresentação atual
         """
-        payload = {"input": {"references": referencia}}
-        payload["version"] = versao or self.versao_padrao
+        payload = {
+            "references": referencia,
+            "version": versao or self.versao_padrao,
+        }
         if quick_presentation:
             payload["quick_presentation"] = True
 
@@ -176,18 +178,15 @@ class HolyricsClient:
         v_fim = ref.versiculo_fim or ref.versiculo_inicio
 
         if v_fim == ref.versiculo_inicio:
-            payload = {"input": {"id": calcular_id(ref.capitulo, ref.versiculo_inicio)}}
+            payload = {"id": calcular_id(ref.capitulo, ref.versiculo_inicio)}
         else:
             ids = [
                 calcular_id(ref.capitulo, v)
                 for v in range(ref.versiculo_inicio, v_fim + 1)
             ]
-            payload = {"input": {"ids": ids}}
+            payload = {"ids": ids}
 
-        if versao:
-            payload["version"] = versao
-        else:
-            payload["version"] = self.versao_padrao
+        payload["version"] = versao or self.versao_padrao
         if quick_presentation:
             payload["quick_presentation"] = True
 
