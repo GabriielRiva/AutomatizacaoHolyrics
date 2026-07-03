@@ -1,0 +1,16 @@
+# Reconhecimento de voz offline
+vosk>=0.3.45
+
+# Captura de áudio
+sounddevice>=0.4.6
+
+# Reamostragem de áudio (usado quando o dispositivo não suporta 16kHz nativamente)
+scipy>=1.10.0
+numpy>=1.24.0
+
+# Cliente HTTP para a API do Holyrics
+requests>=2.31.0
+
+# tkinter (interface gráfica) já vem com o Python padrão no Windows/Mac.
+# No Linux pode ser necessário instalar separadamente, ex:
+#   sudo apt install python3-tk
