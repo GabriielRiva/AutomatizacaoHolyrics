@@ -58,6 +58,12 @@ class HolyricsClient:
         self.timeout = timeout
         self.versao_padrao = versao_padrao
 
+    def definir_token(self, novo_token):
+        """Troca o token em tempo de execução, sem precisar recriar o
+        cliente. Usado pela tela de configuração do token na interface
+        gráfica (sistema_completo.py), pra aplicar a mudança na hora."""
+        self.token = novo_token
+
     def _chamar(self, action, payload=None):
         url = f"{self.base_url}/{action}"
         params = {"token": self.token}

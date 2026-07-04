@@ -42,21 +42,68 @@ from parser_referencias import parse_referencia
 from janela_confirmacao import JanelaConfirmacao
 from holyrics_client import HolyricsClient, HolyricsAPIError
 
+
+def obter_pasta_base():
+    """
+    Retorna a pasta onde o programa está rodando de fato.
+
+    Quando rodado como script Python normal, é a pasta deste arquivo.
+    Quando empacotado como .exe pelo PyInstaller, __file__ aponta pra
+    dentro da pasta temporária de extração — o que queremos é a pasta
+    onde o .exe foi colocado, pra achar 'modelo_vosk_pt' e o arquivo de
+    token ao lado dele.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def carregar_token_holyrics():
+    """
+    Busca o token do Holyrics, nesta ordem de prioridade:
+      1) variável de ambiente HOLYRICS_TOKEN (bom pra desenvolvimento)
+      2) arquivo 'holyrics_token.txt' na mesma pasta do programa (bom
+         pra quem só vai clicar duas vezes no .exe — sem terminal)
+
+    O arquivo texto deve conter só o token, numa linha só, sem aspas.
+    Nunca deve ir pro git (ver .gitignore).
+    """
+    token_env = os.environ.get("HOLYRICS_TOKEN")
+    if token_env:
+        return token_env
+
+    caminho_arquivo = os.path.join(PASTA_BASE, "holyrics_token.txt")
+    if os.path.isfile(caminho_arquivo):
+        # utf-8-sig remove automaticamente o BOM que o Bloco de Notas
+        # do Windows às vezes adiciona no início do arquivo — sem isso,
+        # um caractere invisível ficava colado no início do token e o
+        # Holyrics rejeitava como "invalid token" mesmo com o valor
+        # certo digitado.
+        with open(caminho_arquivo, "r", encoding="utf-8-sig") as f:
+            token_arquivo = f.read().strip()
+        if token_arquivo:
+            return token_arquivo
+
+    return "COLOQUE_SEU_TOKEN_AQUI"
+
+
+PASTA_BASE = obter_pasta_base()
+
 # ----------------------- CONFIGURAÇÃO -----------------------
-# NUNCA deixe o token real commitado no git. Configure a variável de
-# ambiente HOLYRICS_TOKEN antes de rodar, por exemplo:
-#   Windows (PowerShell):  $env:HOLYRICS_TOKEN = "seu_token_aqui"
-#   Windows (cmd):         set HOLYRICS_TOKEN=seu_token_aqui
-#   Linux/Mac:              export HOLYRICS_TOKEN=seu_token_aqui
-# Ou crie um arquivo config_local.py (já no .gitignore) com:
-#   HOLYRICS_TOKEN = "seu_token_aqui"
-# e troque a linha abaixo por: from config_local import HOLYRICS_TOKEN
-HOLYRICS_TOKEN = os.environ.get("HOLYRICS_TOKEN", "COLOQUE_SEU_TOKEN_AQUI")
+# Token do Holyrics: veja carregar_token_holyrics() acima pra entender
+# de onde ele vem (variável de ambiente OU arquivo holyrics_token.txt
+# na mesma pasta do programa/.exe). NUNCA deixe o token real commitado
+# no git — o arquivo holyrics_token.txt já está no .gitignore.
+HOLYRICS_TOKEN = carregar_token_holyrics()
+# Valor mostrado no campo da interface: vazio se ainda não há token
+# configurado (evita mostrar o texto de placeholder como se fosse um
+# token de verdade).
+HOLYRICS_TOKEN_INICIAL = "" if HOLYRICS_TOKEN == "COLOQUE_SEU_TOKEN_AQUI" else HOLYRICS_TOKEN
 HOLYRICS_IP = "127.0.0.1"
 HOLYRICS_PORTA = 8091
 HOLYRICS_VERSAO_BIBLIA = "pt_nvi"   # NVI — troque se sua igreja usar outra
 
-MODEL_PATH = "modelo_vosk_pt"
+MODEL_PATH = os.path.join(PASTA_BASE, "modelo_vosk_pt")
 DEVICE_INDEX = None              # None = dispositivo padrão do sistema
 SAMPLE_RATE_VOSK = 16000
 BLOCO_MS = 250
@@ -70,7 +117,7 @@ class SistemaVersiculos:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Sistema de Versículos — Painel de Controle")
-        self.root.geometry("620x460")
+        self.root.geometry("620x500")
         self.root.configure(bg="#1a1a2e")
         self.root.protocol("WM_DELETE_WINDOW", self._ao_fechar)
 
@@ -93,8 +140,29 @@ class SistemaVersiculos:
         )
 
         self._montar_interface()
+        self._logar_diagnostico_inicial()
         self._verificar_holyrics_em_thread()
         self._carregar_modelo_em_thread()
+
+    def _logar_diagnostico_inicial(self):
+        """Loga de onde vieram as configurações principais, sem expor o
+        token completo — só o suficiente pra diagnosticar problema de
+        leitura de arquivo/variável de ambiente no local do culto."""
+        self._log(f"Pasta base do programa: {PASTA_BASE}")
+
+        if os.environ.get("HOLYRICS_TOKEN"):
+            origem_token = "variável de ambiente HOLYRICS_TOKEN"
+        elif os.path.isfile(os.path.join(PASTA_BASE, "holyrics_token.txt")):
+            origem_token = "arquivo holyrics_token.txt"
+        else:
+            origem_token = "NENHUMA FONTE ENCONTRADA (usando placeholder)"
+
+        if HOLYRICS_TOKEN and HOLYRICS_TOKEN != "COLOQUE_SEU_TOKEN_AQUI":
+            preview = f"{HOLYRICS_TOKEN[:4]}...{HOLYRICS_TOKEN[-2:]} ({len(HOLYRICS_TOKEN)} caracteres)"
+        else:
+            preview = "(nenhum token configurado)"
+
+        self._log(f"Token do Holyrics: origem = {origem_token}, valor = {preview}")
 
     # ---------------------- INTERFACE ----------------------
 
@@ -114,7 +182,39 @@ class SistemaVersiculos:
             self.root, text="Holyrics: verificando conexão...",
             font=("Segoe UI", 9), fg="#8888aa", bg="#1a1a2e",
         )
-        self.rotulo_holyrics.pack(pady=(0, 15))
+        self.rotulo_holyrics.pack(pady=(0, 10))
+
+        frame_token = tk.Frame(self.root, bg="#1a1a2e")
+        frame_token.pack(pady=(0, 15), padx=20, fill="x")
+
+        tk.Label(
+            frame_token, text="Token do Holyrics:", font=("Segoe UI", 9, "bold"),
+            fg="#8888aa", bg="#1a1a2e",
+        ).pack(side="left", padx=(0, 8))
+
+        self.var_token = tk.StringVar(value=HOLYRICS_TOKEN_INICIAL)
+        self.entrada_token = tk.Entry(
+            frame_token, textvariable=self.var_token, show="•",
+            font=("Consolas", 10), bg="#0f0f1a", fg="#eeeeee",
+            insertbackground="white", relief="flat", width=22,
+        )
+        self.entrada_token.pack(side="left", padx=(0, 8), ipady=4)
+
+        self.var_mostrar_token = tk.BooleanVar(value=False)
+        tk.Checkbutton(
+            frame_token, text="mostrar", variable=self.var_mostrar_token,
+            command=self._alternar_visibilidade_token,
+            font=("Segoe UI", 8), fg="#8888aa", bg="#1a1a2e",
+            selectcolor="#0f0f1a", activebackground="#1a1a2e",
+            activeforeground="#8888aa",
+        ).pack(side="left", padx=(0, 8))
+
+        tk.Button(
+            frame_token, text="Salvar", font=("Segoe UI", 9, "bold"),
+            bg="#2d5d7d", fg="white", activebackground="#3a7a9d",
+            relief="flat", cursor="hand2", padx=10,
+            command=self._salvar_token,
+        ).pack(side="left")
 
         self.botao_iniciar = tk.Button(
             self.root, text="▶ Iniciar Captura", font=("Segoe UI", 13, "bold"),
@@ -142,6 +242,35 @@ class SistemaVersiculos:
             font=("Segoe UI", 9), fg="#666688", bg="#1a1a2e",
         )
         self.rotulo_rodape.pack(pady=(0, 10))
+
+    def _alternar_visibilidade_token(self):
+        """Alterna entre mostrar o token em texto puro ou escondido
+        atrás de •, conforme o checkbox 'mostrar'."""
+        self.entrada_token.config(show="" if self.var_mostrar_token.get() else "•")
+
+    def _salvar_token(self):
+        """
+        Salva o token digitado na interface em holyrics_token.txt (na
+        pasta do programa) e aplica a mudança na hora, sem precisar
+        reiniciar — atualiza o cliente Holyrics já em uso e testa a
+        conexão de novo automaticamente.
+        """
+        novo_token = self.var_token.get().strip()
+        if not novo_token:
+            self._log("Token vazio — nada foi salvo.")
+            return
+
+        caminho_arquivo = os.path.join(PASTA_BASE, "holyrics_token.txt")
+        try:
+            with open(caminho_arquivo, "w", encoding="utf-8") as f:
+                f.write(novo_token)
+        except OSError as e:
+            self._log(f"ERRO ao salvar o token em disco: {e}")
+            return
+
+        self.cliente_holyrics.definir_token(novo_token)
+        self._log("Token salvo. Testando conexão com o Holyrics...")
+        self._verificar_holyrics_em_thread()
 
     def _log(self, texto):
         """Thread-safe: sempre agenda a escrita no widget pra thread
