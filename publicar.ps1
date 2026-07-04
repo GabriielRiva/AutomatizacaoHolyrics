@@ -16,7 +16,7 @@ $ErrorActionPreference = "Stop"
 $PastaInstalacao = "C:\Projetos\sistema-versiculos\Instalado"
 
 Write-Host "== 1) Buildando com PyInstaller ==" -ForegroundColor Cyan
-pyinstaller --onedir --windowed --noconfirm --name SistemaVersiculos --collect-all vosk --collect-all sounddevice sistema_completo.py
+pyinstaller --onedir --windowed --noconfirm --name SistemaVersiculos --icon "assets\icone.ico" --collect-all vosk --collect-all sounddevice sistema_completo.py
 
 if (-not (Test-Path "dist\SistemaVersiculos\SistemaVersiculos.exe")) {
     Write-Host "ERRO: build não gerou o .exe esperado. Veja os erros acima." -ForegroundColor Red
@@ -59,5 +59,20 @@ Write-Host "Programa instalado em: $PastaInstalacao"
 Write-Host "O holyrics_token.txt (se existir) NÃO foi tocado -- ele só é criado/atualizado"
 Write-Host "pela própria tela do programa (campo Token + botão Salvar), e fica salvo"
 Write-Host "para sempre nessa pasta de instalação, mesmo que você rebuilde de novo."
+Write-Host ""
+
+Write-Host "== 5) Criando atalho na Área de Trabalho ==" -ForegroundColor Cyan
+$CaminhoAtalho = Join-Path ([Environment]::GetFolderPath("Desktop")) "Sistema de Versiculos.lnk"
+$WshShell = New-Object -ComObject WScript.Shell
+$Atalho = $WshShell.CreateShortcut($CaminhoAtalho)
+$Atalho.TargetPath = "$PastaInstalacao\SistemaVersiculos.exe"
+$Atalho.WorkingDirectory = $PastaInstalacao
+$Atalho.IconLocation = "$PastaInstalacao\SistemaVersiculos.exe"
+$Atalho.Description = "Sistema de Versículos - Painel de Controle"
+$Atalho.Save()
+Write-Host "Atalho criado em: $CaminhoAtalho" -ForegroundColor Green
+Write-Host ""
+Write-Host "Dica: clique com o botão direito nesse atalho e escolha 'Fixar em Iniciar'"
+Write-Host "pra deixar ele também no menu Iniciar do Windows."
 Write-Host ""
 Write-Host "Abra sempre o .exe a partir de: $PastaInstalacao\SistemaVersiculos.exe"
