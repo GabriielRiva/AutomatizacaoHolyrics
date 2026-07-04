@@ -27,10 +27,39 @@ explícita de uma pessoa. O sistema só sugere candidatas.
 | `janela_confirmacao.py` | Popup de confirmação (Tkinter) — mostra a referência detectada e espera Enter (confirmar) / Esc (cancelar) / timeout. |
 | `holyrics_client.py` | Cliente da API HTTP do Holyrics (autenticação por token, ação `ShowVerse`, etc.) |
 | `parser_referencias.py` | Núcleo: interpreta texto transcrito e extrai referências bíblicas (livro, capítulo, versículo). |
+| `busca_versiculo_texto.py` | Reconhece versículo **citado de cor** (sem falar a referência), comparando a fala transcrita contra o texto da Bíblia. |
+| `converter_biblia_dominio_publico.py` | Script de uma vez só que gerou `biblia_texto_dominio_publico.json` a partir dos dados brutos da Bíblia Livre. Não precisa rodar de novo, só documentado aqui por transparência. |
+| `biblia_texto_dominio_publico.json` | Corpus de texto da Bíblia (domínio público) usado só para *identificar* qual versículo está sendo citado — o versículo exibido de fato no telão sempre vem da versão instalada no Holyrics. |
 | `numeros_pt.py` | Converte números por extenso em português ("vinte e três" → 23). |
 | `biblia_livros.py` | Dicionário dos 66 livros da Bíblia com todas as variações faladas (abreviações, "primeiro/segundo", etc.) e a numeração canônica usada nos IDs do Holyrics. |
 | `listar_dispositivos.py` | Lista os dispositivos de áudio disponíveis no sistema, pra você achar o índice da interface USB da X32. |
 | `testar_arquivo_audio.py` | Testa o pipeline STT + parser usando um arquivo `.wav` gravado, sem precisar de microfone ao vivo. |
+
+## Reconhecimento por citação de cor
+
+Além de detectar referências ditas diretamente ("João três dezesseis"),
+o sistema também tenta reconhecer quando alguém **recita o texto do
+versículo de memória**, sem falar a referência. Ele faz isso comparando
+a fala transcrita contra o texto completo da Bíblia (usando a **Bíblia
+Livre — BLIVRE, 2018**, que é de **domínio público**, fonte:
+https://github.com/damarals/biblias).
+
+Importante:
+- O texto da BLIVRE é usado só internamente, pra *identificar* qual é
+  o versículo — o que aparece de fato no telão continua vindo da
+  versão que a igreja já tem instalada e configurada no Holyrics
+  (NVI, ACF, etc.), via `holyrics_client.py`.
+- Esse tipo de reconhecimento é **naturalmente menos preciso** que a
+  referência direta — citação de memória raramente bate palavra por
+  palavra com o texto escrito. O limiar de confiança é mais alto de
+  propósito (`LIMIAR_CONFIANCA_TEXTO_LIVRE` em `sistema_completo.py`),
+  preferindo não sugerir nada a sugerir o versículo errado.
+- Se o versículo já estiver sendo exibido no momento, o sistema não
+  fica reabrindo a confirmação repetidamente pra ele — só avisa quando
+  é algo novo.
+- Frases curtas ou com poucas palavras "raras" (cumprimentos, avisos,
+  frases do dia a dia do culto) são ignoradas de propósito, porque
+  combinariam com versículos demais pra dar uma resposta confiável.
 
 ## Instalação
 
@@ -50,10 +79,25 @@ sudo apt install python3-tk
 ### Baixe o modelo de voz Vosk (português)
 
 1. Baixe em: https://alphacephei.com/vosk/models
-   - Recomendado pra começar: `vosk-model-small-pt-0.3` (~50 MB, rápido)
-   - Pra mais precisão depois: `vosk-model-pt-fb-v0.1.1-20220516_2113`
+   - **Recomendado (melhor precisão, testado e em uso):**
+     `vosk-model-pt-fb-v0.1.1-20220516_2113` (~1.6 GB, modelo grande do
+     FalaBrasil)
+   - Alternativa mais leve (se a máquina for fraca ou faltar espaço):
+     `vosk-model-small-pt-0.3` (~50 MB, mais rápido, mas erra mais
+     palavras raras como "Deuteronômio"/"Eclesiastes" e números
+     compostos longos como "cento e dezenove")
 2. Descompacte a pasta baixada e renomeie (ou ajuste o caminho) pra
    `modelo_vosk_pt/` na raiz do projeto.
+
+⚠️ **Bug conhecido do modelo grande:** a pasta `rescore/` desse modelo
+específico vem com um arquivo (`G.carpa`) incompatível com várias
+versões da lib `vosk`, causando o erro genérico
+`Exception: Failed to create a model` (ou, com log mais detalhado,
+`ConstArpaLm <LmStates> section reading failed`). Isso é um problema
+relatado por várias pessoas no repositório oficial do Vosk, não é erro
+de instalação. **Solução:** renomeie (ou apague) a pasta
+`modelo_vosk_pt/rescore/` — ela é opcional (só serve pra um refinamento
+extra de precisão) e o modelo carrega normalmente sem ela.
 
 Essa pasta **não deve ir pro git** (já está no `.gitignore` — é grande
 e é só um download, não código).

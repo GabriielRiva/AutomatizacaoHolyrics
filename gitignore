@@ -1,0 +1,41 @@
+# Modelo Vosk (arquivos grandes, baixados separadamente — ver README)
+modelo_vosk_pt/
+*.zip
+
+# Áudios de teste
+*.wav
+!teste_exemplo.wav
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Configuração local com segredos (token do Holyrics, etc.)
+config_local.py
+holyrics_token.txt
+.env
+
+# Empacotamento PyInstaller
+build/
+dist/
+*.spec
+
+# Pasta de instalação estável (gerada por publicar.ps1) -- contém o
+# modelo Vosk (~2.5GB) e outros arquivos grandes, não deve ir pro git
+Instalado/
+
+# Dados brutos temporários da conversão da Bíblia de domínio público
+# (só usados uma vez por converter_biblia_dominio_publico.py -- o
+# resultado final, biblia_texto_dominio_publico.json, é versionado)
+BLIVRE_raw/
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
