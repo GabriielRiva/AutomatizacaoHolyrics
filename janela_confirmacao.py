@@ -175,6 +175,14 @@ class JanelaConfirmacao:
 
         btn_confirmar.focus_set()
 
+        # Garante que a janela realmente receba o foco do teclado do SO
+        # (no Windows, popups criados via Toplevel às vezes não recebem
+        # foco automático — sem isso, Enter/Esc não fazem nada até o
+        # usuário clicar manualmente na janela primeiro).
+        janela.lift()
+        janela.focus_force()
+        janela.after(50, btn_confirmar.focus_set)
+
         self._agendar_contagem_regressiva(janela, ref, rotulo_timeout,
                                            self.timeout_segundos)
 
